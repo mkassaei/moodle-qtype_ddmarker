@@ -308,6 +308,7 @@ var DDMARKER_QUESTION = function() {
  * This is the code for question rendering.
  */
 Y.extend(DDMARKER_QUESTION, M.qtype_ddmarker.dd_base_class, {
+    touchScrollDisable: null,
     pendingid: '',
     initializer : function() {
         this.pendingid = 'qtype_ddmarker-' + Math.random().toString(36).slice(2); // Random string.
@@ -334,6 +335,38 @@ Y.extend(DDMARKER_QUESTION, M.qtype_ddmarker.dd_base_class, {
         }
         return drag;
     },
+
+    /**
+     * dragNoScrolling allows users of touch screen devices to use drag and drop
+     * and normal scrolling at the same time. I.e.when touching and dragging a
+     * draggable item, the screen does not scroll, but you can scroll by touching
+     * other area of the screen apart from the draggable items
+     */
+    dragNoScrolling : function(drag) {
+        var touchstart = (Y.UA.ie) ? 'MSPointerStart' : 'touchstart';
+        var touchend = (Y.UA.ie) ? 'MSPointerEnd' : 'touchend';
+        var touchmove = (Y.UA.ie) ? 'MSPointerMove' : 'touchmove';
+
+        // Disable scrolling when touching the draggable items.
+        drag.on(touchstart, function() {
+            if (this.touchScrollDisable) {
+                return; // Already disabled.
+            }
+            this.touchScrollDisable = Y.one('body').on(touchmove, function(e) {
+                e = e || window.event;
+                e.preventDefault();
+            });
+        }, this);
+
+        // Allow scrolling after releasing the draggable items.
+        drag.on(touchend, function() {
+            if (this.touchScrollDisable) {
+                this.touchScrollDisable.detach();
+                this.touchScrollDisable = null;
+            }
+        }, this);
+    },
+
     draggable : function (drag) {
         var dd = new Y.DD.Drag({
             node: drag,
@@ -360,7 +393,11 @@ Y.extend(DDMARKER_QUESTION, M.qtype_ddmarker.dd_base_class, {
         //--- keyboard accessibility
         drag.set('tabIndex', 0);
         drag.on('dragchange', this.drop_zone_key_press, this);
+
+        // Prevent scrolling whilst dragging on Adroid devices.
+        this.dragNoScrolling(drag);
     },
+
     save_all_xy_for_choice: function (choiceno, dropped) {
         var coords = [];
         var bgimgxy;
